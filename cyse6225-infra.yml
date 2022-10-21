@@ -1,31 +1,36 @@
 AWSTemplateFormatVersion: "2010-09-09"
 
-Description: Creating VPC then adding IGW to it establishing three public subnets on the same virtual private network
+Description: Creating VPC attaching IGW to it and then Creating three public subnets in same vpc
 Parameters:
   Environment:
-    Description: a resource name preceded with an environment name
+    Description: An environment name that is prefixed to resource names
     Type: String
     Default: csye6225-environment
 
   VpcCIDR:
     Type: String
     Default: 10.192.0.0/16
-    Description: Enter the IP range please
+    Description: Please enter the IP range
 
   CIDRPublicSubnet1:
     Type: String
     Default: 10.192.10.0/24
-    Description: The IP range in the first Availability Zone should be entered
+    Description: Please enter the IP range in the first Availability Zone
 
   CIDRPublicSubnet2:
     Type: String
     Default: 10.192.11.0/24
-    Description: The IP range in the second Availability Zone should be entered
+    Description: Please enter the IP range in the second Availability Zone
 
   CIDRPublicSubnet3:
     Type: String
     Default: 10.192.20.0/24
-    Description: The IP range in the third Availability Zone should be entered
+    Description: Please enter the IP range in the third Availability Zone
+
+  AMIId:
+    Type: String
+    Default: ami-0ab01458485559f5f
+    Description: My Ami id 
 
 Resources:
   VPC:
@@ -83,7 +88,48 @@ Resources:
       Tags:
         - Key: Name
           Value: !Sub ${Environment} Public Subnet (AZ3)
- #creating A Public Route Table:
+
+  WebAppInstance:
+    Type: 'AWS::EC2::Instance'
+    Properties:
+      ImageId: !Ref AMIId
+      InstanceType: t2.micro
+      SubnetId: !Ref PublicSubnet1
+      SecurityGroupIds:
+        - Ref: InstanceSecurityGroup
+      BlockDeviceMappings:
+        - DeviceName: /dev/sda1
+          Ebs:
+            VolumeSize: 50
+            VolumeType: gp2          
+  
+#adding security groups
+  InstanceSecurityGroup:
+    Type: AWS::EC2::SecurityGroup
+    Properties:
+      GroupName: "application"
+      GroupDescription: "Allow HTTP/HTTPS and SSH and port 8080"
+      VpcId: !Ref VPC
+      SecurityGroupIngress:
+        - IpProtocol: tcp
+          FromPort: 80
+          ToPort: 80
+          CidrIp: 0.0.0.0/0
+        - IpProtocol: tcp
+          FromPort: 443
+          ToPort: 443
+          CidrIp: 0.0.0.0/0 
+        - IpProtocol: tcp
+          FromPort: 22
+          ToPort: 22
+          CidrIp: 0.0.0.0/0 
+        - IpProtocol: tcp
+          FromPort: 8080
+          ToPort: 8080
+          CidrIp: 0.0.0.0/0
+
+  
+  #creating A Public Route Table:
   Route:
     Type: AWS::EC2::RouteTable
     Properties:
@@ -91,7 +137,7 @@ Resources:
       Tags:
         - Key: Name
           Value: !Sub ${Environment} Public Routes
- #constructing a public route with the target CIDR block 0.0.0.0/0 and the above-mentioned public route table
+ #creating a public route to above created public route table with destination CIDR block 0.0.0.0/0 and Above created IGW 
   DefaultPublicRoute:
     Type: AWS::EC2::Route
     DependsOn: IGAttachment
@@ -99,25 +145,25 @@ Resources:
       RouteTableId: !Ref Route
       DestinationCidrBlock: 0.0.0.0/0
       GatewayId: !Ref InternetGateway
- #The public subnets-1 are being connected to the public route table:
+ #Attaching the public subnets-1 to the Public Route Table:
   PSubnet1RouteAssociation:
     Type: AWS::EC2::SubnetRouteTableAssociation
     Properties:
       RouteTableId: !Ref Route
       SubnetId: !Ref PublicSubnet1
-  #The public subnets-2 are being connected to the public route table:
+  #Attaching the public subnets-2 to the Public Route Table:
   PSubnet2RouteAssociation:
     Type: AWS::EC2::SubnetRouteTableAssociation
     Properties:
       RouteTableId: !Ref Route
       SubnetId: !Ref PublicSubnet2
-  #The public subnets-3 are being connected to the public route table:
+  #Attaching the public subnets-3 to the Public Route Table:
   PSubnet3RouteAssociation:
     Type: AWS::EC2::SubnetRouteTableAssociation
     Properties:
       RouteTableId: !Ref Route
       SubnetId: !Ref PublicSubnet3
-#Exposing 1 stack resources to others
+#For exposing the resources from one Stack on CloudFormation to Others
 Outputs:
   VpcId:
     Description: The VPC ID
