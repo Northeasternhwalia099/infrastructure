@@ -1,109 +1,230 @@
 AWSTemplateFormatVersion: "2010-09-09"
+Description: CSYE Assignment 03
 
-Description: Creating VPC attaching IGW to it and then Creating three public subnets in same vpc
 Parameters:
-  Environment:
-    Description: An environment name that is prefixed to resource names
-    Type: String
-    Default: csye6225-environment
-
-  VpcCIDR:
+  VPCCIDR:
+    Description: Please enter the IP range (CIDR notation) for this VPC
     Type: String
     Default: 10.192.0.0/16
-    Description: Please enter the IP range
 
-  CIDRPublicSubnet1:
+  subACIDR:
+    Description: Please enter the IP range (CIDR notation) for the public subnet in the first Availability Zone
     Type: String
     Default: 10.192.10.0/24
-    Description: Please enter the IP range in the first Availability Zone
-
-  CIDRPublicSubnet2:
-    Type: String
-    Default: 10.192.11.0/24
-    Description: Please enter the IP range in the second Availability Zone
-
-  CIDRPublicSubnet3:
-    Type: String
-    Default: 10.192.20.0/24
-    Description: Please enter the IP range in the third Availability Zone
 
   AMIId:
+    Description: MY AMI ID
     Type: String
-    Default: ami-0ab01458485559f5f
-    Description: My Ami id 
+    Default: ami-023fd0647d5e12775
+
+  RootVolumeSize:
+    Description: size of volume
+    Type: Number
+    Default: "50"
+
+  RootVolumeType:
+    Description: Volume_type
+    Type: String
+    Default: gp2
+
+  InstanceType:
+    Description: instance_type
+    Type: String
+    Default: t2.micro
+
+  DeleteOnTermin:
+    Description: Delete_on_Termination
+    Type: String
+    Default: true
+
+  AvailabilityZoneA:
+    Description: Zone-A
+    Type: Number
+    Default: 0
+
+  PrivateSubnet1CIDR:
+    Description: Please enter the IP range (CIDR notation) for the private subnet in the first Availability Zone
+    Type: String
+    Default: 10.192.20.0/24
+
+  PrivateSubnet2CIDR:
+    Description: Please enter the IP range (CIDR notation) for the private subnet in the second Availability Zone
+    Type: String
+    Default: 10.192.21.0/24
+
+  PrivateSubnet3CIDR:
+    Description: Please enter the IP range (CIDR notation) for the private subnet in the second Availability Zone
+    Type: String
+    Default: 10.192.22.0/24
+
+  PrivateAZ1:
+    Description: Private-AZ-1
+    Type: Number
+    Default: "0"
+
+  PrivateAZ2:
+    Description: Private-AZ-2
+    Type: Number
+    Default: "1"
+
+  PrivateAZ3:
+    Description: Private-AZ-3
+    Type: Number
+    Default: "2"
+
+  DatabaseEngine:
+    Description: database engine
+    Type: String
+    Default: MySQL
+
+  DBInstanceClass:
+    Description: Type of db space to be allocated
+    Type: String
+    Default: db.t3.micro
+
+  MultiAZDeployment:
+    Description: Deploy to multiple availability zones
+    Type: String
+    Default: false
+    AllowedValues: [true, false]
+
+  DBInstanceIdentifier:
+    Description: Identifier for the instance
+    Type: String
+    Default: csye6225
+
+  MasterUsername:
+    Description: Master username
+    Type: String
+    Default: csye6225
+
+  MasterPassword:
+    Description: Master password
+    Type: String
+    Default: csye6225
+
+  PublicAccessibility:
+    Description: Public Accessibility
+    Type: String
+    Default: "false"
+    AllowedValues: [true, false]
+
+  DatabaseName:
+    Description: database name
+    Type: String
+    Default: csye6225
 
 Resources:
+  # vpc
   VPC:
     Type: AWS::EC2::VPC
     Properties:
-      CidrBlock: !Ref VpcCIDR
+      CidrBlock: !Ref VPCCIDR
       EnableDnsSupport: true
       EnableDnsHostnames: true
       Tags:
         - Key: Name
-          Value: !Ref Environment
-  #creating IGW
+          Value: !Join ["", [!Ref "AWS::StackName", "-VPC"]]
+
+  # connects to public network
   InternetGateway:
     Type: AWS::EC2::InternetGateway
-    Properties:
-      Tags:
-        - Key: Name
-          Value: !Ref Environment
-  #Attaching above created IGW with myVPC
-  IGAttachment:
+    DependsOn: VPC
+
+  AttachGateway:
     Type: AWS::EC2::VPCGatewayAttachment
     Properties:
+      VpcId: !Ref VPC
       InternetGatewayId: !Ref InternetGateway
-      VpcId: !Ref VPC
- #creating Public Subnet-1:
-  PublicSubnet1:
+
+  SubnetA:
     Type: AWS::EC2::Subnet
     Properties:
       VpcId: !Ref VPC
-      AvailabilityZone: !Select [0, !GetAZs ""]
-      CidrBlock: !Ref CIDRPublicSubnet1
-      MapPublicIpOnLaunch: true
+      CidrBlock: !Ref subACIDR
+      AvailabilityZone: !Select [!Ref AvailabilityZoneA, !GetAZs ] # Get the first AZ in the list
       Tags:
         - Key: Name
-          Value: !Sub ${Environment} Public Subnet (AZ1)
- #creating Public Subnet-2:
-  PublicSubnet2:
-    Type: AWS::EC2::Subnet
-    Properties:
-      VpcId: !Ref VPC
-      AvailabilityZone: !Select [1, !GetAZs ""]
-      CidrBlock: !Ref CIDRPublicSubnet2
-      MapPublicIpOnLaunch: true
-      Tags:
-        - Key: Name
-          Value: !Sub ${Environment} Public Subnet (AZ2)
-  #creating Public Subnet-3:
-  PublicSubnet3:
-    Type: AWS::EC2::Subnet
-    Properties:
-      VpcId: !Ref VPC
-      AvailabilityZone: !Select [2, !GetAZs ""]
-      CidrBlock: !Ref CIDRPublicSubnet3
-      MapPublicIpOnLaunch: false
-      Tags:
-        - Key: Name
-          Value: !Sub ${Environment} Public Subnet (AZ3)
+          Value: !Sub ${AWS::StackName}-Public-A
 
   WebAppInstance:
-    Type: 'AWS::EC2::Instance'
+    Type: "AWS::EC2::Instance"
     Properties:
       ImageId: !Ref AMIId
-      InstanceType: t2.micro
-      SubnetId: !Ref PublicSubnet1
-      SecurityGroupIds:
-        - Ref: InstanceSecurityGroup
+      UserData:
+        Fn::Base64: !Sub |
+          #!/bin/bash
+          cd /home/ubuntu/
+          touch application.properties
+          echo server.port = 8080 >> application.properties
+          echo spring.jpa.hibernate.ddl-auto=update >> application.properties
+          echo spring.datasource.url=jdbc:mysql:\/\/${DBinstance.Endpoint.Address}:3306\/csye6225 >> application.properties
+          echo spring.datasource.driver-class-name=com.mysql.cj.jdbc.Driver >> application.properties
+          echo spring.datasource.username=csye6225 >> application.properties
+          echo spring.datasource.password=csye6225 >> application.properties
+          echo spring.jpa.properties.hibernate.dialect=org.hibernate.dialect.MySQL8Dialect >> application.properties
+          echo bucketName=${EncryptedS3Bucket} >> application.properties
+          echo s3.bucket.region=us-east-1 >> application.properties
+          echo spring.profiles.active=ec2 >> application.properties
+          chmod 764 application.properties
+          sudo systemctl daemon-reload
+          sudo systemctl enable appservice.service
+          sudo systemctl start appservice.service
+          sudo systemctl status appservice.service
+
+      InstanceType: !Ref InstanceType
+      NetworkInterfaces:
+        - AssociatePublicIpAddress: true
+          DeviceIndex: "0"
+          GroupSet: [!Ref InstanceSecurityGroup]
+          SubnetId: !Ref SubnetA
       BlockDeviceMappings:
         - DeviceName: /dev/sda1
           Ebs:
-            VolumeSize: 50
-            VolumeType: gp2          
-  
-#adding security groups
+            VolumeSize: !Ref RootVolumeSize
+            DeleteOnTermination: !Ref DeleteOnTermin
+      IamInstanceProfile: !Ref S3EC2InstanceProfile
+
+  S3EC2InstanceProfile:
+    Type: AWS::IAM::InstanceProfile
+    Properties:
+      InstanceProfileName: s3-ec2-instance-profile
+      Path: /
+      Roles:
+        - !Ref S3EC2InstanceRole
+
+  S3EC2InstanceRole:
+    Type: AWS::IAM::Role
+    Properties:
+      RoleName: s3-ec2-instance-role
+      AssumeRolePolicyDocument:
+        Version: 2012-10-17
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service:
+                - ec2.amazonaws.com
+            Action:
+              - sts:AssumeRole
+      Path: /
+
+  EC2InstanceS3Policy:
+    Type: AWS::IAM::Policy
+    Properties:
+      PolicyName: DemoS3Policy
+      PolicyDocument:
+        Version: 2012-10-17
+        Statement:
+          - Effect: Allow
+            Action:
+              - s3:*
+            Resource:
+              - !Sub arn:aws:s3:::${EncryptedS3Bucket}
+              - !Sub arn:aws:s3:::${EncryptedS3Bucket}/*
+
+      Roles:
+        - !Ref S3EC2InstanceRole
+
   InstanceSecurityGroup:
     Type: AWS::EC2::SecurityGroup
     Properties:
@@ -118,65 +239,181 @@ Resources:
         - IpProtocol: tcp
           FromPort: 443
           ToPort: 443
-          CidrIp: 0.0.0.0/0 
+          CidrIp: 0.0.0.0/0
         - IpProtocol: tcp
           FromPort: 22
           ToPort: 22
-          CidrIp: 0.0.0.0/0 
+          CidrIp: 0.0.0.0/0
         - IpProtocol: tcp
           FromPort: 8080
           ToPort: 8080
           CidrIp: 0.0.0.0/0
 
-  
-  #creating A Public Route Table:
-  Route:
+  PublicRouteTable:
     Type: AWS::EC2::RouteTable
     Properties:
       VpcId: !Ref VPC
       Tags:
         - Key: Name
-          Value: !Sub ${Environment} Public Routes
- #creating a public route to above created public route table with destination CIDR block 0.0.0.0/0 and Above created IGW 
-  DefaultPublicRoute:
+          Value: Public
+
+  PublicRoute1:
     Type: AWS::EC2::Route
-    DependsOn: IGAttachment
+    DependsOn: AttachGateway
     Properties:
-      RouteTableId: !Ref Route
+      RouteTableId: !Ref PublicRouteTable
       DestinationCidrBlock: 0.0.0.0/0
       GatewayId: !Ref InternetGateway
- #Attaching the public subnets-1 to the Public Route Table:
-  PSubnet1RouteAssociation:
+
+  SubnetARouteTableAssociation:
     Type: AWS::EC2::SubnetRouteTableAssociation
     Properties:
-      RouteTableId: !Ref Route
-      SubnetId: !Ref PublicSubnet1
-  #Attaching the public subnets-2 to the Public Route Table:
-  PSubnet2RouteAssociation:
+      SubnetId: !Ref SubnetA
+      RouteTableId: !Ref PublicRouteTable
+
+  EncryptedS3Bucket:
+    Type: AWS::S3::Bucket
+    Properties:
+      BucketName: !Join ["", [!Ref "AWS::StackName", "-s3"]]
+      LifecycleConfiguration:
+        Rules:
+          - Id: TransitionRule
+            Status: Enabled
+            Transitions:
+              - TransitionInDays: 30
+                StorageClass: STANDARD_IA
+    DeletionPolicy: Delete
+
+  # Database
+  DbSubnetGroup:
+    Type: "AWS::RDS::DBSubnetGroup"
+    Properties:
+      DBSubnetGroupName: "subnetgroup"
+      DBSubnetGroupDescription: "Subnet Group"
+      SubnetIds:
+        - !Ref "PrivateSubnet1"
+        - !Ref "PrivateSubnet2"
+        - !Ref "PrivateSubnet3"
+
+  DBEC2SecurityGroup:
+    Type: AWS::EC2::SecurityGroup
+    Properties:
+      GroupName: "database"
+      VpcId: !Ref VPC
+      GroupDescription: "Allow mysql inbound traffic"
+      SecurityGroupIngress:
+        - IpProtocol: tcp
+          FromPort: 3306
+          ToPort: 3306
+          SourceSecurityGroupId: !Ref InstanceSecurityGroup
+      Tags:
+        - Key: Name
+          Value: !Sub ${AWS::StackName} DB Security Group
+
+  DBParamGroup:
+    Type: AWS::RDS::DBParameterGroup
+    Properties:
+      Description: SQL custom param group
+      Family: mysql8.0
+      Parameters:
+        performance_schema: 1
+
+  DBinstance:
+    Type: AWS::RDS::DBInstance
+    Properties:
+      DBInstanceClass: !Ref DBInstanceClass
+      Engine: !Ref DatabaseEngine
+      MasterUsername: !Ref MasterUsername
+      MasterUserPassword: !Ref MasterPassword
+      DBSubnetGroupName: !Ref DbSubnetGroup
+      MultiAZ: !Ref MultiAZDeployment
+      PubliclyAccessible: !Ref PublicAccessibility
+      DBName: !Ref DatabaseName
+      DBInstanceIdentifier: !Ref DBInstanceIdentifier
+      DBParameterGroupName: !Ref DBParamGroup
+      AllocatedStorage: "5"
+      VPCSecurityGroups:
+        - !Ref DBEC2SecurityGroup
+    DeletionPolicy: Delete
+
+  # Private Subnets
+  PrivateSubnet1:
+    Type: AWS::EC2::Subnet
+    Properties:
+      VpcId: !Ref VPC
+      AvailabilityZone: !Select [!Ref PrivateAZ1, !GetAZs ""]
+      CidrBlock: !Ref PrivateSubnet1CIDR
+      MapPublicIpOnLaunch: false
+      Tags:
+        - Key: Name
+          Value: !Sub ${AWS::StackName} Private Subnet (AZ1)
+
+  PrivateSubnet2:
+    Type: AWS::EC2::Subnet
+    Properties:
+      VpcId: !Ref VPC
+      AvailabilityZone: !Select [!Ref PrivateAZ2, !GetAZs ""]
+      CidrBlock: !Ref PrivateSubnet2CIDR
+      MapPublicIpOnLaunch: false
+      Tags:
+        - Key: Name
+          Value: !Sub ${AWS::StackName} Private Subnet (AZ2)
+
+  PrivateSubnet3:
+    Type: AWS::EC2::Subnet
+    Properties:
+      VpcId: !Ref VPC
+      AvailabilityZone: !Select [!Ref PrivateAZ3, !GetAZs ""]
+      CidrBlock: !Ref PrivateSubnet3CIDR
+      MapPublicIpOnLaunch: false
+      Tags:
+        - Key: Name
+          Value: !Sub ${AWS::StackName} Private Subnet (AZ3)
+
+  # Private Route Table
+
+  PrivateRouteTable:
+    Type: AWS::EC2::RouteTable
+    Properties:
+      VpcId: !Ref VPC
+      Tags:
+        - Key: Name
+          Value: !Sub ${AWS::StackName} Private Routes (AZ)
+
+  # Private route table associations
+  PrivateSubnet1RouteTableAssociation:
     Type: AWS::EC2::SubnetRouteTableAssociation
     Properties:
-      RouteTableId: !Ref Route
-      SubnetId: !Ref PublicSubnet2
-  #Attaching the public subnets-3 to the Public Route Table:
-  PSubnet3RouteAssociation:
+      SubnetId: !Ref PrivateSubnet1
+      RouteTableId: !Ref PrivateRouteTable
+
+  PrivateSubnet2RouteTableAssociation:
     Type: AWS::EC2::SubnetRouteTableAssociation
     Properties:
-      RouteTableId: !Ref Route
-      SubnetId: !Ref PublicSubnet3
-#For exposing the resources from one Stack on CloudFormation to Others
-Outputs:
-  VpcId:
-    Description: The VPC ID
-    Value: !Ref VPC
-  PublicSubnet1:  
-    Description: Public Subnet-1
-    Value: !Ref PublicSubnet1
-  PublicSubnet2:  
-    Description: Public Subnet-2
-    Value: !Ref PublicSubnet2
-  PublicSubnet3:  
-    Description: Public Subnet-3
-    Value: !Ref PublicSubnet3
-  Subnets:
-    Description: The list of subnets
-    Value: !Join [",",[ !Ref PublicSubnet1 , !Ref PublicSubnet2 , !Ref PublicSubnet3]]
+      SubnetId: !Ref PrivateSubnet2
+      RouteTableId: !Ref PrivateRouteTable
+
+  PrivateSubnet3RouteTableAssociation:
+    Type: AWS::EC2::SubnetRouteTableAssociation
+    Properties:
+      SubnetId: !Ref PrivateSubnet3
+      RouteTableId: !Ref PrivateRouteTable
+
+  DefaultPrivateRoute:
+    Type: AWS::EC2::Route
+    Properties:
+      RouteTableId: !Ref PrivateRouteTable
+      DestinationCidrBlock: 0.0.0.0/0
+      NatGatewayId: !Ref NatGateway
+
+  NatGateway:
+    Type: AWS::EC2::NatGateway
+    Properties:
+      AllocationId: !GetAtt NatGatewayEIP.AllocationId
+      SubnetId: !Ref SubnetA
+
+  NatGatewayEIP:
+    Type: AWS::EC2::EIP
+    DependsOn: AttachGateway
+    Properties:
+      Domain: vpc
