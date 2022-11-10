@@ -15,7 +15,12 @@ Parameters:
   AMIId:
     Description: MY AMI ID
     Type: String
-    Default: ami-040b681099fdad1a4
+    Default: ami-0ffa9c3a00903ec5f
+    #ami-081d66a67a512c04f
+    # ami-08ade8f4e94e17638
+    #ami-0a073d283fb7c90d1
+    #ami-0462e26aa3c3a8498
+    #ami-040b681099fdad1a4
     #  ami-023fd0647d5e12775
 
   RootVolumeSize:
@@ -26,7 +31,7 @@ Parameters:
   HostedZoneName:
     Description: hostname
     Type: String
-    Default: dev.webappcsye6225.me.
+    Default: dev.walia-cloud.me.
 
   RootVolumeType:
     Description: Volume_type
@@ -173,6 +178,15 @@ Resources:
           echo s3.bucket.region=us-east-1 >> application.properties
           echo spring.profiles.active=ec2 >> application.properties
           chmod 764 application.properties
+          sudo yum update -y
+          sudo yum install ruby -y
+          sudo yum install wget -y
+          sudo yum install amazon-cloudwatch-agent -y
+          sudo /opt/aws/amazon-cloudwatch-agent/bin/amazon-cloudwatch-agent-ctl \
+            -a fetch-config \
+            -m ec2 \
+            -c file:/etc/aws/cloudwatch_config.json \
+            -s
           sudo systemctl daemon-reload
           sudo systemctl enable appservice.service
           sudo systemctl start appservice.service
@@ -214,6 +228,8 @@ Resources:
             Action:
               - sts:AssumeRole
       Path: /
+      ManagedPolicyArns:
+        - "arn:aws:iam::aws:policy/CloudWatchAgentServerPolicy"
 
   EC2InstanceS3Policy:
     Type: "AWS::IAM::Policy"
@@ -387,7 +403,7 @@ Resources:
       Comment: DNS name for my instance.
       Name: !Ref "HostedZoneName"
       Type: A
-      TTL: "900"
+      TTL: "60"
       ResourceRecords:
         - !GetAtt WebAppInstance.PublicIp
   PrivateSubnet2:
