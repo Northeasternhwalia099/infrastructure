@@ -11,7 +11,7 @@ We will use `AWS CloudFormation` for infrastructure setup and tear-down.
 
 Use the following instructions to set up `dev`, `prod` || `stage` and `root` profiles for resource creation using `AWS CloudFormation`:
 
-### Creating IAM User Groups
+### Creating IAM User Groups as:
 
 - Sign in to your AWS `root` account console.
 - Navigate into the IAM console.
