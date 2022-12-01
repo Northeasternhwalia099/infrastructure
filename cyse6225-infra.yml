@@ -357,8 +357,6 @@ Resources:
     Type: "AWS::RDS::DBSubnetGroup"
     Properties:
       DBSubnetGroupName: "subnetgroup"
-      KmsKeyId: !Ref RdsKeyId
-      StorageEncrypted: true
       DBSubnetGroupDescription: "Subnet Group"
       SubnetIds:
         - !Ref "PrivateSubnet1"
@@ -397,6 +395,8 @@ Resources:
       MasterUserPassword: !Ref MasterPassword
       DBSubnetGroupName: !Ref DbSubnetGroup
       MultiAZ: !Ref MultiAZDeployment
+      KmsKeyId: !Ref RdsKeyId
+      StorageEncrypted: true
       PubliclyAccessible: !Ref PublicAccessibility
       DBName: !Ref DatabaseName
       DBInstanceIdentifier: !Ref DBInstanceIdentifier
@@ -649,7 +649,7 @@ Resources:
       RouteTableId: !Ref PublicRouteTable
       SubnetId: !Ref PublicSubnet3
 
-  RdsKey:
+  RdsKeyId:
     Type: AWS::KMS::Key
     Properties:
       Description: "RDS KMS key"
@@ -661,9 +661,10 @@ Resources:
             Effect: Allow
             Principal:
               AWS: !Join
-                - "arn:aws:iam::"
-                - !Ref "AWS::AccountId"
-                - ":root"
+                - ""
+                - - "arn:aws:iam::"
+                  - !Ref "AWS::AccountId"
+                  - ":root"
             Action: kms:*
             Resource: "*"
           - Sid: Allow access for Key Administrators
@@ -692,9 +693,38 @@ Resources:
             Resource: "*"
           - Sid: Allow use of the key
             Effect: Allow
-            Pricipal:
+            Principal:
               AWS: !Join
                 - ""
+                - - "arn:aws:iam::"
+                  - !Ref "AWS::AccountId"
+                  - ":role/aws-service-role/rds.amazonaws.com/AWSServiceRoleForRDS"
+            Action:
+              - kms:Encrypt
+              - kms:Decrypt
+              - kms:ReEncrypt
+              - kms:GenerateDataKey
+              - kms:DescribeKey
+            Resource: "*"
+          - Sid: Allow attachment of persistent resources
+            Effect: Allow
+            Principal:
+              AWS: !Join
+                - ""
+                - - "arn:aws:iam::"
+                  - !Ref "AWS::AccountId"
+                  - ":role/aws-service-role/rds.amazonaws.com/AWSServiceRoleForRDS"
+            Action:
+              - kms:CreateGrant
+              - kms:ListGrants
+              - kms:RevokeGrants
+            Resource: "*"
+
+  RdsAlias:
+    Type: AWS::KMS::Alias
+    Properties:
+      AliasName: alias/rds
+      TargetKeyId: !Ref RdsKeyId
 
   EBSKey:
     Type: AWS::KMS::Key
@@ -711,56 +741,24 @@ Resources:
                 - - "arn:aws:iam::"
                   - !Ref "AWS::AccountId"
                   - ":root"
-            Action:
-              - kms:Create*
-              - kms:Describe*
-              - kms:Enable*
-              - kms:List*
-              - kms:Put*
-              - kms:Update*
-              - kms:Revoke*
-              - kms:Disable*
-              - kms:Get*
-              - kms:Delete*
-              - kms:TagResource
-              - kms:UntagResource
-              - kms:ScheduleKeyDeletion
-              - kms:CancelKeyDeletion
+            Action: "kms:*"
             Resource: "*"
-          - Sid: Allow use of the key
-            Effect: Allow
-            Pricipal:
-              AWS: !Join
-                - ""
-                - - "arn:aws:iam::"
-                  - !Ref "AWS::AccountId"
-                  - ":role/aws-service-role/rds.amazonaws.com/AWSServiceRoleForAutoScaling"
-            Action:
-              - kms:Encrypt
-              - kms:Decrypt
-              - kms:ReEncrypt
-              - kms:GenerateDataKey
-              - kms:DescribeKey
-            Resource: "*"
-          - Sid: Allow attachment of persistent resources
+          - Sid: Enable Autoscalling
             Effect: Allow
             Principal:
               AWS: !Join
                 - ""
                 - - "arn:aws:iam::"
                   - !Ref "AWS::AccountId"
-                  - ":role/aws-service-role/rds.amazonaws.com/AWSServiceRoleForAutoScaling"
+                  - ":role/aws-service-role/autoscaling.amazonaws.com/AWSServiceRoleForAutoScaling"
             Action:
+              - "kms:Encrypt"
+              - "kms:Decrypt"
+              - "kms:ReEncrypt*"
+              - "kms:GenerateDataKey*"
+              - "kms:DescribeKey"
               - kms:CreateGrant
-              - kms:ListGrants
-              - kms:RevokeGrants
             Resource: "*"
-
-  EBSAlias:
-    Type: AWS::KMS::Alias
-    Properties:
-      AliasName: alias/ebs
-      TargetKeyId: !Ref EBSKey
 
   loadBalancerSecurityGroup:
     Type: AWS::EC2::SecurityGroup
@@ -901,7 +899,7 @@ Resources:
       Namespace: AWS/EC2
       Statistic: Average
       Period: "60"
-      EvaluationPeriods: "2"
+      EvaluationPeriods: "1"
       Threshold: "5"
       AlarmActions:
         - !Ref ApplicationScaleUpPolicy
@@ -918,7 +916,7 @@ Resources:
       Namespace: AWS/EC2
       Statistic: Average
       Period: "60"
-      EvaluationPeriods: "2"
+      EvaluationPeriods: "1"
       Threshold: "3"
       AlarmActions:
         - !Ref ApplicationScaleDownPolicy
